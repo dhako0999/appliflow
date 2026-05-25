@@ -15,7 +15,17 @@ const openai = new OpenAI({
 })
 
 
-app.use(cors());
+//app.use(cors());
+app.use(
+  cors({
+    origin: [
+      "http://localhost:5173",
+      "https://appliflow-delta.vercel.app",
+    ],
+    credentials: true,
+  })
+);
+
 app.use(express.json());
 
 const supabase = createClient(
