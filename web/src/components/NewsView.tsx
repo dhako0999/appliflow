@@ -85,7 +85,7 @@ export default function NewsView() {
                     {newsCategories.map((category) => (
                         <button
                                key={category.value}
-                               onClick={(e) => setSelectedCategory(category.value)}
+                               onClick={() => setSelectedCategory(category.value)}
                                className={`rounded-full px-4 py-2 text-sm font-medium transition ${selectedCategory === category.value ? "bg-blue-600 text-white" : "border border-slate-200 bg-white text-slate-700 hover:bg-slate-50"}`}
                         >
                             {category.label}
@@ -141,13 +141,16 @@ export default function NewsView() {
                                 }
                             </p>
 
-                            <a 
-                               href={article.url}
-                               target="_blank"
-                               rel="noopener noreferrer"
-                               className="mt-4 inline-flex text-sm font-semibold text-blue-600 hover:text-blue-700"
-                               >Read Article →
-                            </a>
+                            {article.url && (
+                                <a
+                                    href={article.url}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="mt-4 inline-flex text-sm font-semibold text-blue-600 hover:text-blue-700"
+                                >
+                                    Read Article →
+                                </a>
+                            )}
                          </div>  
                     ))}
                 </div>

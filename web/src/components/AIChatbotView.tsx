@@ -1,7 +1,6 @@
 import { useState } from "react";
 
 import { supabase } from "../lib/supabase";
-import type { Session } from "@supabase/supabase-js";
 
 import CareerInsights from "./CareerInsights";
 
@@ -53,7 +52,7 @@ export default function AIChatbotView() {
 
     async function handleSendMessage(promptText?: string) {
 
-        const messageText = input.trim() || promptText.trim();
+        const messageText = input.trim() || (promptText?.trim() ?? "");
         
         if(!messageText || loading) return;
 

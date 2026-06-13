@@ -42,8 +42,7 @@ export default function MockInterviewView() {
     const [expandedHistoryId, setExpandedHistoryId] = useState<string | null>(null);
 
     const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
-    const [completedSessionId, setCompletedSessionId] = useState<string | null>(null);
-
+    
     const [completedSession, setCompletedSession] = useState<MockInterviewSession | null>(null);
 
     const [completedSummary, setCompletedSummary] = useState<{
@@ -329,7 +328,6 @@ export default function MockInterviewView() {
       setVideoUrl("");
       setVideoBlob(null);
       setCurrentSessionId(null);
-      setCompletedSessionId(null);
       setCompletedSession(null);
       setCompletedSummary(null);
     }
@@ -366,7 +364,6 @@ export default function MockInterviewView() {
         }
     
         console.log("Completed session:", data.session.id);
-        setCompletedSessionId(currentSessionId);
         setCompletedSession(data.session);
         setCompletedSummary(data.summary);
     
@@ -526,6 +523,7 @@ export default function MockInterviewView() {
                 <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
                   Interview Question
                 </h2>
+
                 <p className="mt-2 text-lg font-medium text-slate-900">
                   {question.question_text}
                 </p>
@@ -738,7 +736,7 @@ export default function MockInterviewView() {
                 <div className="space-y-4">
                   {history.map((item) => {
                     const question = item.mock_interview_questions;
-                    const session = question.mock_interview_sessions;
+                    const session = question?.mock_interview_sessions;
                     const job = session?.jobs;
 
                     const isExpanded = expandedHistoryId === item.id;
