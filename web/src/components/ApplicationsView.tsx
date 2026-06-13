@@ -351,57 +351,69 @@ function ApplicationsView({ jobs, setJobs, session, }: { jobs: Job[], setJobs: R
             <h2 className="text-lg font-semibold">Applications</h2>
 
             <div className="mt-4 space-y-3">
-                {jobs.map((job) => (
-                    <div key={job.id} className="flex justify-between rounded-xl border border-slate-200 p-2">
-                        <div>
-                            <p className="font-semibold">{job.title}</p>
-                            <p className="text-sm text-slate-500">{job.company}</p>
-                            <p className="mt-2 text-sm">Status: {job.status}</p>
-                        </div>
-                        <div>
-                            <button 
-                                   onClick={async () => {
-                                         setSelectedJob(job);
-                                         setEditJobDescription(job.job_description || "");
-                                         setEditApplicationUrl(job.application_url || "");
-                                         setEditInterviewNotes(job.interview_notes || "");
-                                         setEditDeadline(job.deadline || "");
-                                         setEditSalaryRange(job.salary_range || "");
-                                         setEditLocation(job.location || "");
-                                         setResumeUrl("");
-                                         setCoverLetterUrl("");
-
-                                         if (job.resume_file_path) {
-                                            const resumeSignedUrl = await createdSignedFileUrl(
-                                              "resumes",
-                                              job.resume_file_path
-                                            );
-                                          
-                                            setResumeUrl(resumeSignedUrl);
-                                          }
-                                          
-                                          if (job.cover_letter_file_path) {
-                                            const coverLetterSignedUrl = await createdSignedFileUrl(
-                                              "cover-letters",
-                                              job.cover_letter_file_path
-                                            );
-                                          
-                                            setCoverLetterUrl(coverLetterSignedUrl);
-                                          }
-
-                                   }}
-
-                                   className="rounded-xl border border-slate-300 px-4 py-2 font-sm text-slate-700 hover:bg-slate-700 hover:text-white"
-                                   >
-                                    Manage Details
-                                   </button>
-                        </div>
+                {jobs.length === 0 ? (
+                    <div className="rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center">
+                        <p className="text-base font-semibold text-slate-800">No applications yet</p>
+                        <p className="mt-2 text-sm text-slate-500">
+                            Add your first application from the dashboard to start tracking your progress.
+                        </p>
+                    </div>    
+                ) : (
+                   
+                    jobs.map((job) => (
+                        <div key={job.id} className="flex justify-between rounded-xl border border-slate-200 p-2">
+                            <div>
+                                <p className="font-semibold">{job.title}</p>
+                                <p className="text-sm text-slate-500">{job.company}</p>
+                                <p className="mt-2 text-sm">Status: {job.status}</p>
+                            </div>
+                            <div>
+                                <button 
+                                    onClick={async () => {
+                                            setSelectedJob(job);
+                                            setEditJobDescription(job.job_description || "");
+                                            setEditApplicationUrl(job.application_url || "");
+                                            setEditInterviewNotes(job.interview_notes || "");
+                                            setEditDeadline(job.deadline || "");
+                                            setEditSalaryRange(job.salary_range || "");
+                                            setEditLocation(job.location || "");
+                                            setResumeUrl("");
+                                            setCoverLetterUrl("");
+    
+                                            if (job.resume_file_path) {
+                                                const resumeSignedUrl = await createdSignedFileUrl(
+                                                "resumes",
+                                                job.resume_file_path
+                                                );
+                                            
+                                                setResumeUrl(resumeSignedUrl);
+                                            }
+                                            
+                                            if (job.cover_letter_file_path) {
+                                                const coverLetterSignedUrl = await createdSignedFileUrl(
+                                                "cover-letters",
+                                                job.cover_letter_file_path
+                                                );
+                                            
+                                                setCoverLetterUrl(coverLetterSignedUrl);
+                                            }
+    
+                                    }}
+    
+                                    className="rounded-xl border border-slate-300 px-4 py-2 font-sm text-slate-700 hover:bg-slate-700 hover:text-white"
+                                    >
+                                        Manage Details
+                                    </button>
+                            </div>
+                            
+                        </div>  
                         
-                    </div>  
-                    
-                    
-                    
-                ))}
+                        
+                        
+                    ))
+                  
+                )}
+                
             </div>
 
             {selectedJob && (
