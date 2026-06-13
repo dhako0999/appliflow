@@ -647,8 +647,8 @@ function App() {
         {/* Main */}
         <main className="flex-1">
           {/* Top nav */}
-          <header className="border-b border-slate-200 bg-white px-6 py-4">
-            <div className="flex items-center justify-between">
+          <header className="border-b border-slate-200 bg-white px-4 py-4 sm:px-6">
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
               <div>
                 <h1 className="text-2xl font-bold tracking-tight text-slate-800">
                     Dashboard
@@ -658,7 +658,7 @@ function App() {
                 </p>
               </div>
 
-              <div className="hidden items-center gap-3 md:flex">
+              <div className="flex flex-wrap items-center gap-3">
                 {loading && (
                   <span className="flex items-center gap-2 text-sm font-medium text-blue-600">
                     <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-blue-600" />
@@ -684,7 +684,7 @@ function App() {
                         </button>
 
                         {showNotifications && (
-                          <div className="absolute right-0 top-14 z-50 w-96 rounded-2xl border border-slate-200 bg-white p-4 shadow-xl">
+                          <div className="fixed left-1/2 top-24 z-50 max-h-[70vh] w-[calc(100vw-2rem)] -translate-x-1/2 overflow-y-auto rounded-2xl border border-slate-200 bg-white p-4 shadow-xl sm:absolute sm:left-auto sm:right-0 sm:top-14 sm:w-96 sm:translate-x-0">
                             <div className="flex items-center justify-between">
                               <h3 className="font-semibold text-slate-900">
                                 Notifications
