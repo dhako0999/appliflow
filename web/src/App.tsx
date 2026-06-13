@@ -12,6 +12,9 @@ import AnalyticsView from "./components/AnalyticsView";
 import RecruitersView from "./components/RecruitersView";
 import ApplicationsView from "./components/ApplicationsView";
 import InterviewsView from "./components/InterviewsView";
+import AIChatbotView from "./components/AIChatbotView";
+import MockInterviewView from "./components/MockInterviewView";
+import NewsView from "./components/NewsView";
 
 import { getApplicationsOverTime } from "./lib/api";
 
@@ -48,6 +51,8 @@ function App() {
   const lastName = session?.user?.user_metadata?.last_name || "";
 
   const initials = `${firstName.charAt(0)}${lastName.charAt(0)}`.toUpperCase();
+
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
 
   /*useEffect(() => {
@@ -98,6 +103,8 @@ function App() {
       listener.subscription.unsubscribe();
     };
   }, []);
+
+
 
   const filteredJobs = useMemo(() => {
     return jobs.filter((job) => {
@@ -433,89 +440,209 @@ function App() {
   }
 
 
+  const navItems = [
+    {
+      label: "Dashboard",
+      path: "M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z",
+    },
+    {
+      label: "Applications",
+      path: "M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z",
+    },
+    {
+      label: "Interviews",
+      path: "M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z",
+    },
+    {
+      label: "Recruiters",
+      path: "M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-5.13a4 4 0 11-8 0 4 4 0 018 0zm6 0a4 4 0 11-8 0 4 4 0 018 0z",
+    },
+    {
+      label: "Analytics",
+      path: "M9 19v-6m4 6V5m4 14v-9M5 21h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2z",
+    },
+    {
+      label: "AI Chatbot",
+      path: "M8 10h.01M12 10h.01M16 10h.01M21 12c0 4.418-4.03 8-9 8a9.77 9.77 0 01-4-.83L3 20l.93-3.72A7.7 7.7 0 013 12c0-4.418 4.03-8 9-8s9 3.582 9 8z",
+    },
+    {
+      label: "Mock Interviews",
+      path: "M15.75 10.5V6a3.75 3.75 0 10-7.5 0v4.5m11.25 0A2.25 2.25 0 0121.75 12.75v6A2.25 2.25 0 0119.5 21H4.5A2.25 2.25 0 012.25 18.75v-6A2.25 2.25 0 014.5 10.5h15z",
+
+    },
+    {
+      label: "News",
+      path: "M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5A3.375 3.375 0 0010.125 2.25H6.75A2.25 2.25 0 004.5 4.5v15A2.25 2.25 0 006.75 21h10.5a2.25 2.25 0 002.25-2.25v-4.5z",
+    }
+  ];
+
+
 
   return (
     <div className="min-h-screen bg-slate-50/60 text-slate-800" style={{ backgroundColor: "#f8fafc" }}>
+        {/* Mobile Header */}
+        <header className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-4 lg:hidden">
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 via-indigo-500 to-violet-600 text-sm font-bold text-white shadow-md shadow-blue-500/25">
+              AI
+            </div>
+
+            <div>
+              <div className="text-base font-semibold text-slate-800">
+                AppliFlow
+              </div>
+              <p className="text-xs text-slate-500">AI-powered job search</p>
+            </div>
+          </div>
+
+          <button
+            onClick={() => setMobileMenuOpen(true)}
+            className="rounded-xl border border-slate-200 bg-slate-50 px-3 py-2 text-slate-700 transition hover:bg-slate-100"
+          >
+            ☰
+          </button>
+        </header>
       <div className="flex min-h-screen">
-        {/* Sidebar */}
-        <aside className="hidden w-96 flex-col border-r border-slate-200 bg-white p-6 lg:flex">
-              {/* Brand */}
-              <div className="mb-10 flex items-center gap-3">
-                <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 to-indigo-600 text-sm font-bold text-white shadow-md shadow-blue-500/25">
-                  AI
-                </div>
-                <div>
-                  {/* Brand name: text-[15px] → text-lg */}
-                    <div className="text-lg font-semibold tracking-tight text-slate-800">
+      
+
+        {/* Mobile Drawer */}
+        {mobileMenuOpen && (
+          <div className="fixed inset-0 z-50 lg:hidden">
+            <div
+              className="absolute inset-0 bg-slate-900/40"
+              onClick={() => setMobileMenuOpen(false)}
+            />
+
+            <aside className="absolute left-0 top-0 h-full w-80 max-w-[85vw] border-r border-slate-200 bg-white p-6 shadow-2xl">
+              <div className="mb-8 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 via-indigo-500 to-violet-600 text-sm font-bold text-white shadow-md shadow-blue-500/25">
+                    AI
+                  </div>
+
+                  <div>
+                    <div className="text-lg font-semibold text-slate-800">
                       AppliFlow
                     </div>
-                    {/* Tagline: text-xs → text-sm */}
-                    <p className="text-sm text-slate-500">Your AI-powered job search management</p>
+                    <p className="text-sm text-slate-600">
+                      Job search management
+                    </p>
+                  </div>
                 </div>
+
+                <button
+                  onClick={() => setMobileMenuOpen(false)}
+                  className="rounded-lg p-2 text-slate-500 transition hover:bg-slate-100"
+                >
+                  ✕
+                </button>
               </div>
 
-              {/* Navigation */}
-              <nav className="flex-1 space-y-1">
-              <p className="mb-3 px-3 text-sm font-semibold uppercase tracking-wider text-slate-500">
-                  Menu
-              </p>
-
-                {[
-                  {
-                    label: "Dashboard",
-                    path: "M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z",
-                  },
-                  {
-                    label: "Applications",
-                    path: "M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z",
-                  },
-                  {
-                    label: "Interviews",
-                    path: "M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z",
-                  },
-                  {
-                    label: "Recruiters",
-                    path: "M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87m6-5.13a4 4 0 11-8 0 4 4 0 018 0zm6 0a4 4 0 11-8 0 4 4 0 018 0z",
-                  },
-                  {
-                    label: "Analytics",
-                    path: "M9 19v-6m4 6V5m4 14v-9M5 21h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2z",
-                  },
-                ].map(({ label, path }) => {
+              <nav className="space-y-1">
+                {navItems.map(({ label, path }) => {
                   const isActive = activeView === label;
+
                   return (
                     <button
                       key={label}
-                      onClick={() => setActiveView(label)}
-                      className={`group relative flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left text-base font-medium transition-all duration-200 ${
+                      onClick={() => {
+                        setActiveView(label);
+                        setMobileMenuOpen(false);
+                      }}
+                      className={`group relative flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-base font-medium transition-all ${
                         isActive
-                          ? "bg-blue-50 text-blue-700"
+                          ? "bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 shadow-sm"
                           : "text-slate-600 hover:bg-slate-50 hover:text-slate-900"
                       }`}
                     >
-                      {isActive && (
-                        <span className="absolute left-0 top-1/2 h-6 w-1 -translate-y-1/2 rounded-r-full bg-gradient-to-b from-blue-500 to-indigo-600" />
-                      )}
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
                         fill="none"
                         viewBox="0 0 24 24"
                         strokeWidth={1.8}
                         stroke="currentColor"
-                        className={`h-5 w-5 shrink-0 transition-colors ${
-                          isActive
-                            ? "text-blue-600"
-                            : "text-slate-400 group-hover:text-slate-600"
+                        className={`h-5 w-5 shrink-0 ${
+                          isActive ? "text-blue-600" : "text-slate-400"
                         }`}
                       >
-                        <path strokeLinecap="round" strokeLinejoin="round" d={path} />
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          d={path}
+                        />
                       </svg>
+
                       {label}
                     </button>
                   );
                 })}
               </nav>
+            </aside>
+          </div>
+        )}
+        {/* Desktop Sidebar */}
+        <aside className="hidden w-96 flex-col border-r border-slate-200 bg-gradient-to-b from-white via-blue-50/60 to-blue-100/70 p-6 lg:flex">
+          {/* Brand */}
+          <div className="mb-10 flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br from-blue-500 via-indigo-500 to-indigo-600 text-sm font-bold text-white shadow-md shadow-blue-500/25">
+              AI
+            </div>
+
+            <div>
+              <div className="text-lg font-semibold tracking-tight text-slate-800">
+                AppliFlow
+              </div>
+              <p className="text-sm text-slate-500">
+                Your AI-powered job search management
+              </p>
+            </div>
+          </div>
+
+          {/* Navigation */}
+          <nav className="flex-1 space-y-1">
+            <p className="mb-3 px-3 text-sm font-semibold uppercase tracking-wider text-slate-500">
+              Menu
+            </p>
+
+            {navItems.map(({ label, path }) => {
+              const isActive = activeView === label;
+
+              return (
+                <button
+                  key={label}
+                  onClick={() => setActiveView(label)}
+                  className={`group relative flex w-full items-center gap-3 rounded-xl px-3 py-3 text-left text-base font-medium transition-all duration-200 ${
+                    isActive
+                      ? "bg-gradient-to-r from-blue-50 to-indigo-50 text-blue-700 shadow-sm"
+                      : "text-slate-600 hover:bg-white/70 hover:text-slate-900"
+                  }`}
+                >
+                  {isActive && (
+                    <span className="absolute left-0 top-1/2 h-6 w-1 -translate-y-1/2 rounded-r-full bg-gradient-to-b from-blue-500 to-indigo-600" />
+                  )}
+
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    strokeWidth={1.8}
+                    stroke="currentColor"
+                    className={`h-5 w-5 shrink-0 transition-colors ${
+                      isActive
+                        ? "text-blue-600"
+                        : "text-slate-400 group-hover:text-slate-600"
+                    }`}
+                  >
+                    <path strokeLinecap="round" strokeLinejoin="round" d={path} />
+                  </svg>
+
+                  {label}
+                </button>
+              );
+            })}
+          </nav>
         </aside>
+
 
         {/* Main */}
         <main className="flex-1">
@@ -623,11 +750,12 @@ function App() {
           </header>
 
           <section className="p-6">
+            {/* Stats */}
+            <StatsOverview stats={stats} />
 
             {activeView === "Dashboard" && (
               <>
-                {/* Stats */}
-                <StatsOverview stats={stats} />
+                
                 {/* Add job */}
                 <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
                   <h2 className="text-lg font-semibold">Add new application</h2>
@@ -737,36 +865,46 @@ function App() {
 
             {activeView === "Applications" && (
               <>
-               {/* Stats */}
-               <StatsOverview stats={stats} />
-               <ApplicationsView jobs={jobs} setJobs={setJobs} session={session}/>
-               
-              
+               <ApplicationsView jobs={jobs} setJobs={setJobs} session={session}/>  
               </>
             )}
 
             {activeView === "Interviews" && (
               <>
-                 {/*Stats */}
-                 <StatsOverview stats={stats}/>
                  <InterviewsView jobs={jobs} appNotifications={appNotifications} setAppNotifications={setAppNotifications} session={session}/>
               </>
             )}
 
             {activeView === "Recruiters" && (
               <>
-                <StatsOverview stats={stats}/>
                 <RecruitersView jobs={jobs} session={session}/>
               </>
             )}
 
             {activeView === "Analytics" && (
               <>
-                <StatsOverview stats={stats} />
                 <AnalyticsView jobs={jobs} statusCounts={statusCounts} applicationsOverTime={applicationsOverTime} range={range} setRange={setRange}/>
               </>
             )}
-           
+
+            {activeView === "AI Chatbot" && (
+              <>
+                <AIChatbotView/>
+              </>
+            )}
+
+            {activeView === "Mock Interviews" && (
+              <>
+                <MockInterviewView/>
+              </>
+            )}
+
+            {activeView === "News" && (
+              <>
+                <NewsView />
+              </>
+
+            )}
             
 
             

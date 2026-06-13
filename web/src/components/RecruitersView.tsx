@@ -255,7 +255,7 @@ function RecruitersView({ jobs, session, }: { jobs: Job[]; session: Session | nu
     if (numDays >= 14) {
         return {
             label: `Follow up overdue: ${numDays} days`,
-            className: "bg-red-100 text-slate-100",
+            className: "bg-red-50 text-red-700",
         }
     }
 

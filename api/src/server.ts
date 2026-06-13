@@ -6,6 +6,17 @@ import { authenticateUser, AuthenticatedRequest, } from "./middleware/auth.js";
 import OpenAI from "openai";
 import { convertProcessSignalToExitCode } from "node:util";
 
+
+import multer from "multer";
+import { toFile } from "openai/uploads";
+
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: {
+    fileSize: 50 * 1024 * 1024
+  }
+});
+
 dotenv.config();
 
 const app = express();
@@ -13,6 +24,14 @@ const app = express();
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
 })
+
+type MockInterviewFeedback = {
+  score: number;
+  strengths: string[];
+  improvements: string[];
+  suggestedAnswer: string;
+  nextPracticeTip: string;
+};
 
 
 //app.use(cors());
@@ -1262,6 +1281,778 @@ app.post("/notifications/interview-reminder", authenticateUser, async (req: Auth
   
 });
 
+app.post("/ai/chat", authenticateUser, async (req: AuthenticatedRequest, res) => {
+
+  try {
+
+    const userId = req.user?.sub;
+
+    if(!userId) {
+       return res.status(401).json({ error: "User not authorized"});
+    }
+
+    const { message, messages } = req.body;
+
+    
+    if(!message || typeof message !== "string") {
+      return res.status(400).json({ error: "Message is required"});
+    }
+
+    const chatHistory = Array.isArray(messages) ? messages : [];
+
+    const conversationHistory = chatHistory.slice(-10)
+    .filter((msg: { role: string; content: string; }) => typeof msg.role === "string" && typeof msg.content === "string")
+    .map((msg: { role: string; content: string; }) => `${msg.role.toUpperCase()}: ${msg.content}`)
+    .join("\n\n");
+
+
+    const { data: jobs, error: jobsError } = await supabase
+    .from("jobs")
+    .select("id, title, company, status, created_at, interview_notes")
+    .eq("user_id", userId);
+
+    if(jobsError) {
+       console.error("Jobs fetch error: ", jobsError);
+       return res.status(500).json({ error: "Failed to fetch jobs" });
+    }
+
+    const { data: recruiters, error: recruitersError } = await supabase
+    .from("recruiters")
+    .select("id, name, company, email, linkedin_url, relationship_status, notes, last_contacted_at, created_at")
+    .eq("user_id", userId);
+
+    if(recruitersError) {
+       console.error("Recruiters fetch error: ", recruitersError);
+       return res.status(500).json({ error: "Failed to fetch recruiters" });
+    }
+
+    const { data: interviews, error: interviewsError } = await supabase
+    .from("interviews")
+    .select("id, job_id, interview_date, interview_type, stage, prep_notes, created_at")
+    .eq("user_id", userId);
+
+    if(interviewsError) {
+      console.error("Interviews fetch error: ", interviewsError);
+      return res.status(500).json({ error: "Failed to fetch interviews" });
+    }
+
+    const safeJobs = jobs ?? [];
+    const safeRecruiters = recruiters ?? [];
+    const safeInterviews = interviews ?? [];
+
+    const now = new Date();
+
+    const upcomingInterviews = safeInterviews.filter((interview) => {
+      if (!interview.interview_date) return false;
+      return new Date(interview.interview_date) >= now;
+    });
+
+    const pastInterviews = safeInterviews.filter((interview) => {
+      if (!interview.interview_date) return false;
+      return new Date(interview.interview_date) < now;
+    });
+
+    const totalApplications = safeJobs.length;
+
+    const activeApplications = safeJobs.filter(
+      (job) => job.status !== "Rejected" && job.status !== "Offer"
+    ).length;
+
+    const rejectedApplications = safeJobs.filter(
+      (job) => job.status === "Rejected"
+    ).length;
+
+    const offers = safeJobs.filter((job) => job.status === "Offer").length;
+
+    const prompt = `
+        You are an AI Career Copilot inside a job search management app.
+
+        Current date:
+        ${new Date().toISOString()}
+
+        Rules:
+        - Answer using only the user's provided job search data and conversation history.
+        - Be concise, practical, and human-friendly.
+        - Use clear line breaks.
+        - Use short headings.
+        - Use numbered lists for priorities.
+        - Use bullet points for supporting details.
+        - Do not mention past interviews as upcoming.
+        - Only discuss past interviews if the user asks about history, previous interviews, performance, or follow-up.
+        - If there are no upcoming interviews, clearly say there are no upcoming interviews.
+        - Do not overwhelm the user with every record. Prioritize what matters most.
+        - If the user asks for counts or statistics, calculate from the provided data.
+        - If the user asks for advice, give specific next steps.
+        - If the user asks a follow-up question, use the conversation history to understand context.
+
+        User statistics:
+        - Total applications: ${totalApplications}
+        - Active applications: ${activeApplications}
+        - Rejected applications: ${rejectedApplications}
+        - Offers: ${offers}
+        - Recruiters: ${safeRecruiters.length}
+        - Upcoming interviews: ${upcomingInterviews.length}
+        - Past interviews: ${pastInterviews.length}
+
+        Applications:
+        ${JSON.stringify(safeJobs, null, 2)}
+
+        Recruiters:
+        ${JSON.stringify(safeRecruiters, null, 2)}
+
+        Upcoming Interviews:
+        ${JSON.stringify(upcomingInterviews, null, 2)}
+
+        Past Interviews:
+        ${JSON.stringify(pastInterviews, null, 2)}
+
+        Previous conversation:
+        ${conversationHistory || "No previous conversation yet."}
+
+        Response format:
+        Start with a short 1-2 sentence summary.
+
+        Then use this structure when helpful:
+
+        Top Priorities:
+        1. ...
+        2. ...
+        3. ...
+
+        Recommended Actions:
+        - ...
+        - ...
+        - ...
+
+        Important Notes:
+        - ...
+
+        Latest user question:
+        ${message}
+        `;
+
+    const response = await openai.responses.create({
+      model: "gpt-4.1-mini",
+      input: prompt,
+    });
+
+    return res.json({
+      reply: response.output_text,
+    });
+  } catch (error) {
+    console.error("AI chat error:", error);
+
+    return res.status(500).json({
+      error: "Failed to process AI chat message",
+    });
+  }
+});
+
+
+app.get("/ai/insights", authenticateUser, async (req: AuthenticatedRequest, res) => {
+  try {
+    const userId = req.user?.sub;
+
+    if(!userId) {
+       return res.status(401).json({ error: "User not authorized" });
+    }
+
+    const { data: jobs, error: jobsError } = await supabase
+    .from("jobs")
+    .select("id, title, company, status, created_at")
+    .eq("user_id", userId);
+
+    if(jobsError) {
+       return res.status(500).json({ error: "Failed to fetch jobs" });
+    }
+
+    const { data: recruiters, error: recruitersError } = await supabase
+    .from("recruiters")
+    .select("id, name, company, relationship_status, last_contacted_at, created_at")
+    .eq("user_id", userId);
+
+    if(recruitersError) {
+      return res.status(500).json({ error: "Failed to fetch recruiters" });
+    }
+
+    const { data: interviews, error: interviewsError } = await supabase
+    .from("interviews")
+    .select("id, interview_date, interview_type, stage")
+    .eq("user_id", userId);
+
+    if(interviewsError) {
+      return res.status(500).json({ error: "Failed to fetch interviews" });
+    }
+
+    const safeJobs = jobs ?? [];
+    const safeRecruiters = recruiters ?? [];
+    const safeInterviews = interviews ?? [];
+
+    const now = new Date();
+
+    const followUpJobs = safeJobs.filter((job) => {
+      if(job.status === "Rejected" || job.status === "Offer") return false;
+
+      const createdAt = new Date(job.created_at);
+      const daysOld = (now.getTime() - createdAt.getTime()) / (24 * 60 * 60 * 1000);
+
+      return daysOld >= 7
+    });
+
+    const recruitersToContact = safeRecruiters.filter((recruiter) => {
+      if(!recruiter.last_contacted_at) return;
+
+      const lastContactedAt = new Date(recruiter.last_contacted_at);
+
+      const daysAgo = (now.getTime() - lastContactedAt.getTime()) / (24 * 60 * 60 * 1000);
+
+      return daysAgo >= 12;
+    });
+
+    const upcomingInterviews = safeInterviews.filter((interview) => {
+      if(!interview.interview_date) return;
+
+      const interviewDate = new Date(interview.interview_date);
+
+      return interviewDate >= now;
+    });
+
+    const activeOffers = safeJobs.filter((job) => job.status === "Offer");
+
+    return res.json({
+      followUpJobsCount: followUpJobs.length,
+      recruitersToContactCount: recruitersToContact.length,
+      upcomingInterviewsCount: upcomingInterviews.length,
+      activeOffersCount: activeOffers.length,
+
+      followUpJobs,
+      recruitersToContact,
+      upcomingInterviews,
+      activeOffers,
+
+    });
+
+  
+  } catch (error) {
+    console.error("AI insights error: ", error);
+
+    return res.status(500).json({ error: "Failed to generate insights" });
+  }
+});
+
+app.post("/mock-interviews/question", authenticateUser, async (req: AuthenticatedRequest, res) => {
+  try {
+
+    const userId = req.user?.sub;
+
+    if(!userId) {
+       return res.status(401).json({ error: "User not authorized" });
+    }
+
+    const { interviewType, jobId, sessionId } = req.body;
+
+    let session = null;
+
+    if(sessionId) {
+      const { data, error } = await supabase
+      .from("mock_interview_sessions")
+      .select("*")
+      .eq("id", sessionId)
+      .eq("user_id", userId)
+      .single();
+
+      if(error) {
+        return res.status(500).json({ error: "Session not found" });
+      }
+
+      session = data;
+    } else {
+      const { data, error } = await supabase
+      .from("mock_interview_sessions")
+      .insert({
+         user_id: userId,
+         job_id: jobId || null,
+         interview_type: interviewType || "Technical Interview",
+         status: "active"
+      })
+      .select()
+      .single();
+
+      if(error) {
+        return res.status(500).json({ error: "Failed to create session" });
+      }
+
+      session = data;
+    }
+
+
+    
+
+    let selectedJob = null;
+
+    if(jobId) {
+       const { data: job, error: jobError } = await supabase
+       .from("jobs")
+       .select("id, title, company, status, interview_notes")
+       .eq("id", jobId)
+       .eq("user_id", userId)
+       .single();
+
+       if(jobError) {
+         console.error("Job fetch error: ", jobError);
+         return res.status(500).json({ error: "Selected job not found" });
+       }
+
+       selectedJob = job;
+    }
+
+
+    const response = await openai.responses.create({
+      model: "gpt-4.1-mini",
+      input: `
+Generate one realistic interview question:
+
+Interview type: ${interviewType} || "Technical Interview"}
+
+Job context:
+${
+  selectedJob 
+  ? `
+     Company: ${selectedJob.company}
+     Role: ${selectedJob.title}
+     Application Status: ${selectedJob.status}
+     Interview Notes: ${selectedJob.interview_notes || "No interview notes provided"}
+
+  `
+  : "No specific job selected. Generate a general interview question."
+}
+
+Rules:
+- Return only the question.
+- Do not include explanations.
+- Make it realisitic for a job interview
+      
+      `,
+
+
+    });
+
+    const questionText = response.output_text;
+
+    const questionInsert = await supabase
+    .from("mock_interview_questions")
+    .insert({
+      user_id: userId,
+      session_id: session.id,
+      question_text: questionText,
+      question_type: interviewType || "Technical Interview",
+    })
+    .select()
+    .single();
+
+    if(questionInsert.error) {
+       console.error("Error inserting mock interview question: ", questionInsert.error);
+       return res.status(500).json({ error: "Error inserting mock interview question"});
+    }
+
+    return res.json({
+      session,
+      question: questionInsert.data,
+    });
+
+
+  } catch(error) {
+     console.error("Mock interview question error: ", error);
+     return res.status(500).json({
+        error: "Failed to generate mock interview question",
+     });
+
+  }
+});
+
+
+
+app.post("/mock-interviews/submit-video", authenticateUser, upload.single("video"), async (req: AuthenticatedRequest, res) => {
+  
+    try {
+      const userId = req.user?.sub;
+
+      if (!userId) {
+        return res.status(401).json({ error: "User not authorized" });
+      }
+
+      const { questionId, questionText } = req.body;
+
+      if (!questionId || typeof questionId !== "string") {
+        return res.status(400).json({ error: "Question is required" });
+      }
+
+      if(!questionText || typeof questionText !== "string") {
+        return res.status(400).json({ error: "Question text is required" });
+      }
+
+      if (!req.file) {
+        return res.status(400).json({ error: "Video file is required" });
+      }
+
+      const allowedMimeTypes = ["video/webm", "video/mp4", "video/quicktime"];
+
+      if(!allowedMimeTypes.includes(req.file.mimetype)) {
+        return res.status(400).json({
+          error: "Only WEBM, MP4, and MOV videos are supported",
+        });
+      }
+
+
+      const fileName = `${userId}/${Date.now()}-${req.file.originalname || "mock-interview.webm"}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("mock-interview-videos")
+        .upload(fileName, req.file.buffer, {
+          contentType: req.file.mimetype || "video/webm",
+          upsert: false,
+        });
+
+      if (uploadError) {
+        console.error("Video upload error:", uploadError);
+        return res.status(500).json({ error: "Failed to upload video" });
+      }
+
+      const openAIFile = await toFile(
+        req.file.buffer,
+        req.file.originalname || "mock-interview.webm",
+        {
+          type: req.file.mimetype || "video/webm",
+        }
+      );
+
+      const transcription = await openai.audio.transcriptions.create({
+        model: "gpt-4o-mini-transcribe",
+        file: openAIFile,
+      });
+
+      const transcript = transcription.text;
+
+      const feedbackResponse = await openai.responses.create({
+        model: "gpt-4.1-mini",
+        input: `
+You are an expert interview coach.
+
+Interview Question:
+${questionText}
+
+User Transcript:
+${transcript}
+
+Evaluate the user's interview response.
+
+Return ONLY valide JSON. Do not include markdown. Do not include code fences.
+
+The JSON must match this shape:
+
+{
+    "score": 7,
+    "strengths": [
+         "Clear explanation of the problem",
+         "Good use of a concret example",
+    ],
+    "improvements": [
+         "Add more measurable impact",
+         "Structure the answer more clearly"
+    ],
+    "suggestedAnswer": "A strong version of this answer...",
+    "nextPracticeTip": "One focused practice tip..."
+}
+
+
+...
+`,
+      });
+
+      const aiFeedbackText = feedbackResponse.output_text;
+
+      let parsedFeedback: MockInterviewFeedback | null = null;
+
+      try {
+        parsedFeedback = JSON.parse(aiFeedbackText);
+      } catch (error) {
+        console.error("Failed to parse AI feedback JSON:", error);
+      }
+
+      const score = typeof parsedFeedback?.score === "number" ? parsedFeedback.score : null;
+
+      const aiFeedback = parsedFeedback ? JSON.stringify(parsedFeedback) : aiFeedbackText;
+
+      const responseInsert = await supabase
+        .from("mock_interview_responses")
+        .insert({
+          user_id: userId,
+          question_id: questionId,
+          video_path: fileName,
+          transcript,
+          ai_feedback: aiFeedback,
+          score,
+        })
+        .select()
+        .single();
+
+      if (responseInsert.error) {
+        console.error("Response insert error:", responseInsert.error);
+        return res.status(500).json({ error: "Failed to save mock interview response" });
+      }
+
+      return res.json({
+        response: responseInsert.data,
+        transcript,
+        feedback: parsedFeedback,
+        rawFeedback: aiFeedback,
+        score,
+      });
+    } catch (error) {
+      console.error("Submit mock interview video error:", error);
+      return res.status(500).json({
+        error: "Failed to process mock interview video",
+      });
+    }
+  }
+);
+
+app.get("/mock-interviews/history", authenticateUser, async (req: AuthenticatedRequest, res) => {
+    try {
+      const userId = req.user?.sub;
+
+      if (!userId) {
+        return res.status(401).json({ error: "User not authorized" });
+      }
+
+      const { data, error } = await supabase
+        .from("mock_interview_responses")
+        .select(`
+          id,
+          question_id,
+          user_id,
+          video_path,
+          transcript,
+          ai_feedback,
+          score,
+          created_at,
+          mock_interview_questions (
+            id,
+            question_text,
+            question_type,
+            session_id,
+            mock_interview_sessions (
+              id,
+              job_id,
+              interview_type,
+              status,
+              created_at,
+              jobs (
+                id,
+                title,
+                company
+              )
+            )
+          )
+        `)
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        console.error("Mock interview history error:", error);
+        return res.status(500).json({
+          error: "Failed to fetch mock interview history",
+        });
+      }
+
+      const history = await Promise.all(
+        (data ?? []).map(async (item) => {
+          let videoUrl: string | null = null;
+
+          if (item.video_path) {
+            const { data: signedUrlData, error: signedUrlError } =
+              await supabase.storage
+                .from("mock-interview-videos")
+                .createSignedUrl(item.video_path, 60 * 60);
+
+            if (!signedUrlError) {
+              videoUrl = signedUrlData.signedUrl;
+            }
+          }
+
+          return {
+            ...item,
+            videoUrl,
+          };
+        })
+      );
+
+      return res.json({ history });
+    } catch (error) {
+      console.error("Mock interview history server error:", error);
+      return res.status(500).json({
+        error: "Failed to fetch mock interview history",
+      });
+    }
+});
+
+
+app.patch("/mock-interviews/sessions/:sessionId/complete", authenticateUser, async(req: AuthenticatedRequest, res) => {
+
+  try {
+
+    const userId = req.user?.sub;
+
+    if(!userId) {
+      return res.status(401).json({ error: "User is not authorized" });
+    }
+
+    const { sessionId } = req.params;
+
+    const completedAt = new Date().toISOString();
+
+    const { data: session, error: sessionError } = await supabase
+    .from("mock_interview_sessions").
+    update({
+      status: "completed",
+      completed_at: completedAt,
+    })
+    .eq("id", sessionId)
+    .eq("user_id", userId)
+    .select()
+    .single();
+
+    if(sessionError) {
+      console.error("Complete session error: ", sessionError);
+      return res.status(500).json({ error: "Error in setting session as completed"});
+    }
+
+    const { data: questions, error: questionsError } = await supabase
+      .from("mock_interview_questions")
+      .select("id")
+      .eq("session_id", sessionId)
+      .eq("user_id", userId);
+
+    if (questionsError) {
+      console.error("Session questions error:", questionsError);
+      return res.status(500).json({ error: "Failed to fetch session questions" });
+    }
+
+    const questionIds = (questions ?? []).map((question) => question.id);
+
+    if (questionIds.length === 0) {
+      return res.json({
+        session,
+        summary: {
+          questionsAnswered: 0,
+          averageScore: "N/A",
+        },
+      });
+    }
+
+    console.log("Completed sessionId:", sessionId);
+    console.log("Questions found for session:", questions);
+
+    const { data: responses, error: responsesError } = await supabase
+      .from("mock_interview_responses")
+      .select("id, score")
+      .eq("user_id", userId)
+      .in("question_id", questionIds);
+
+    if (responsesError) {
+      console.error("Session summary error:", responsesError);
+      return res.status(500).json({ error: "Failed to calculate summary" });
+    }
+
+    const safeResponses = responses ?? [];
+
+    const scoredResponses = safeResponses.filter(
+      (response) => response.score !== null
+    );
+
+    const averageScore =
+      scoredResponses.length > 0
+        ? (
+            scoredResponses.reduce(
+              (sum, response) => sum + (response.score ?? 0),
+              0
+            ) / scoredResponses.length
+          ).toFixed(1)
+        : "N/A";
+    
+
+        return res.json({
+          session,
+          summary: {
+            questionsAnswered: safeResponses.length,
+            averageScore,
+          },
+        });    
+
+
+  } catch (error) {
+    console.error("Error in setting status as completed: ", error);
+    return res.status(500).json({ error: "Failed to complete session" });
+
+  }
+});
+
+app.get("/news", authenticateUser, async (req: AuthenticatedRequest, res) => {
+  try {
+    const userId = req.user?.sub;
+
+    const category = req.query.category as string | undefined;
+
+    const searchByCategory: Record<string, string> = {
+      all: "technology hiring jobs careers",
+      "job-market": "job market hiring layoffs employment",
+      "interview-prep": "interview tips jobs interview preparation",
+      "resume-tips": "resume advice CV cover letter job application",
+      "tech-careers": "software engineering technology careers AI jobs",
+      salary: "salary negotiation compensation job offer"
+
+    }
+
+    const searchQuery = searchByCategory[category || "all"] || searchByCategory["all"];
+
+    if (!userId) {
+      return res.status(401).json({ error: "User not authorized" });
+    }
+
+    const apiKey = process.env.THE_NEWS_API_KEY;
+
+    if (!apiKey) {
+      return res.status(500).json({ error: "News API key is missing" });
+    }
+
+    const url = new URL("https://api.thenewsapi.com/v1/news/all");
+
+    url.searchParams.set("api_token", apiKey);
+    url.searchParams.set("search", searchQuery);
+    url.searchParams.set("language", "en");
+    url.searchParams.set("limit", "12");
+    url.searchParams.set("sort", "published_at");
+
+    const response = await fetch(url.toString());
+    const data = await response.json();
+
+    console.log("TheNewsAPI response:", data);
+    console.log("Articles returned:", data.data?.length);
+
+    if (!response.ok) {
+      return res.status(response.status).json({
+        error: data.message || "Failed to fetch news",
+      });
+    }
+
+    return res.json({
+      articles: data.data ?? [],
+    });
+  } catch (error) {
+    console.error("Error fetching news articles:", error);
+    return res.status(500).json({ error: "Failed to fetch news" });
+  }
+});
 
 
 /*app.get("/analytics/applications-over-time", async (req, res) => {
